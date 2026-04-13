@@ -1,0 +1,49 @@
+{
+  "name": "sql-cte-peek",
+  "displayName": "SQL CTE Peek",
+  "description": "Hover over CTE aliases to see their query body. Ctrl+Click to jump to definition.",
+  "version": "0.1.0",
+  "publisher": "joshkern",
+  "engines": {
+    "vscode": "^1.78.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:sql",
+    "onLanguage:snowflake-sql"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "SQL CTE Peek",
+      "properties": {
+        "sqlCtePeek.displayMode": {
+          "type": "string",
+          "enum": ["hover", "preview", "side-panel"],
+          "enumDescriptions": [
+            "Inline popup on hover (read-only)",
+            "Read-only CTE preview in a side panel",
+            "Editable split editor scrolled to the CTE definition"
+          ],
+          "default": "side-panel",
+          "description": "How to display CTE previews."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npx tsx --test test/cteParser.test.ts",
+    "package": "npx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.78.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "tsx": "^4.0.0",
+    "@vscode/vsce": "^3.0.0"
+  }
+}
