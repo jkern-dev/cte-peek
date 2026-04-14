@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="cte-peek.png" width="128" alt="SQL CTE Peek logo" />
+</p>
+
 # SQL CTE Peek
 
 Navigate complex SQL with ease. Click on a CTE alias to instantly see its query body — no more scrolling through hundreds of lines to find a definition.
@@ -114,6 +118,10 @@ code --install-extension sql-cte-peek-0.1.0.vsix
 - Parses only the first top-level `WITH` clause per file. Multi-statement SQL files with separate `WITH` clauses will only recognize CTEs from the first one.
 - CTE name matching is purely text-based — if a table or column happens to share a name with a CTE, the extension will treat it as a reference.
 
+## Installation
+
+Search for **SQL CTE Peek** in the VS Code Extensions view, or install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=joshkern.sql-cte-peek).
+
 ## License
 
-MIT
+[MIT](LICENSE)

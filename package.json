@@ -12,8 +12,16 @@
   "engines": {
     "vscode": "^1.78.0"
   },
+  "icon": "cte-peek.png",
   "categories": [
     "Programming Languages"
+  ],
+  "keywords": [
+    "sql",
+    "cte",
+    "peek",
+    "snowflake",
+    "definition"
   ],
   "activationEvents": [
     "onLanguage:sql",
