@@ -29,6 +29,13 @@
           ],
           "default": "side-panel",
           "description": "How to display CTE previews."
+        },
+        "sqlCtePeek.maxNestingDepth": {
+          "type": "integer",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum number of nested CTE preview panels that can be opened when drilling into CTE references."
         }
       }
     }
