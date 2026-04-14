@@ -4,6 +4,11 @@
   "description": "Hover over CTE aliases to see their query body. Ctrl+Click to jump to definition.",
   "version": "0.1.0",
   "publisher": "joshkern",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joshkern/sql-cte-peek"
+  },
+  "license": "MIT",
   "engines": {
     "vscode": "^1.78.0"
   },
