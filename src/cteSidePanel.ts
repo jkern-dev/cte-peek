@@ -221,11 +221,12 @@ export function setupSelectionListener(
     }
 
     if (!wordRange) {
-      // No word under cursor — close from this depth
+      // No word under cursor
       if (clickDepth === -1) {
         await closePanelsFrom(0);
       } else {
-        await closePanelsFrom(clickDepth);
+        // Clicked in a panel — keep it open, close only deeper panels
+        await closePanelsFrom(clickDepth + 1);
       }
       return;
     }
@@ -237,19 +238,26 @@ export function setupSelectionListener(
       if (clickDepth === -1) {
         await closePanelsFrom(0);
       } else {
-        await closePanelsFrom(clickDepth);
+        // Clicked a non-CTE word in a panel — keep it open, close only deeper panels
+        await closePanelsFrom(clickDepth + 1);
       }
       return;
     }
 
-    // Skip if clicking the CTE definition itself (only relevant for source)
-    if (clickDepth === -1) {
+    // Skip if clicking the CTE definition itself (not a reference)
+    // In side-panel mode doc is the source document so positionAt works directly.
+    // In preview mode the body never contains the definition name, so this is safe.
+    if (doc.uri.scheme !== 'cte-peek') {
       const defPos = doc.positionAt(cte.nameOffset);
       if (
         defPos.line === wordRange.start.line &&
         defPos.character === wordRange.start.character
       ) {
-        await closePanelsFrom(0);
+        if (clickDepth === -1) {
+          await closePanelsFrom(0);
+        } else {
+          await closePanelsFrom(clickDepth + 1);
+        }
         return;
       }
     }
