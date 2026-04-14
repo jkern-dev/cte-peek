@@ -4,7 +4,7 @@ import { CteDefinitionProvider } from './cteDefinitionProvider';
 import { CtePreviewProvider, setupSelectionListener } from './cteSidePanel';
 import { clearCache, disposeCache } from './cteCache';
 
-const SUPPORTED_LANGUAGES = ['sql', 'snowflake-sql'];
+const SUPPORTED_LANGUAGES = ['sql', 'snowflake-sql', 'sql-mssql'];
 
 export function activate(context: vscode.ExtensionContext): void {
   // Read-only preview provider (for "preview" mode)

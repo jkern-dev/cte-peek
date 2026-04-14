@@ -2,7 +2,7 @@
   "name": "sql-cte-peek",
   "displayName": "SQL CTE Peek",
   "description": "Hover over CTE aliases to see their query body. Ctrl+Click to jump to definition.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "joshkern",
   "repository": {
     "type": "git",
@@ -25,7 +25,8 @@
   ],
   "activationEvents": [
     "onLanguage:sql",
-    "onLanguage:snowflake-sql"
+    "onLanguage:snowflake-sql",
+    "onLanguage:sql-mssql"
   ],
   "main": "./out/extension.js",
   "contributes": {
