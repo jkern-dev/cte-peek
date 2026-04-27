@@ -1,0 +1,26 @@
+.gitignore
+  c1964f822059df23 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "20f06d19113f3ea29ed5c8e6886ef5c0b193d0c2",
+  "prompts": {
+    "c1964f822059df23": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "590fe47b-9dce-4f50-afc1-3c786cb27595",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "jkern-dev",
+      "messages": [],
+      "total_additions": 70,
+      "total_deletions": 69,
+      "accepted_lines": 70,
+      "overriden_lines": 0,
+      "custom_attributes": {
+        "runtime": "local"
+      }
+    }
+  }
+}
