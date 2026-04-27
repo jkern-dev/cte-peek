@@ -40,12 +40,14 @@ const cteHoverProvider_1 = require("./cteHoverProvider");
 const cteDefinitionProvider_1 = require("./cteDefinitionProvider");
 const cteSidePanel_1 = require("./cteSidePanel");
 const cteCache_1 = require("./cteCache");
-const SUPPORTED_LANGUAGES = ['sql', 'snowflake-sql'];
+const dbtModelLocator_1 = require("./dbtModelLocator");
+const SUPPORTED_LANGUAGES = ['sql', 'snowflake-sql', 'sql-mssql', 'jinja-sql'];
 function activate(context) {
     // Read-only preview provider (for "preview" mode)
     const previewProvider = new cteSidePanel_1.CtePreviewProvider();
     context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('cte-peek', previewProvider));
     context.subscriptions.push(previewProvider);
+    (0, dbtModelLocator_1.setupDbtModelWatcher)(context);
     // Selection listener handles both "preview" and "side-panel" modes
     (0, cteSidePanel_1.setupSelectionListener)(context, previewProvider, SUPPORTED_LANGUAGES);
     // Hover (for "hover" mode) + Go-to-definition (always active)
@@ -59,5 +61,6 @@ function activate(context) {
 }
 function deactivate() {
     (0, cteCache_1.disposeCache)();
+    (0, dbtModelLocator_1.clearDbtModelCache)();
 }
 //# sourceMappingURL=extension.js.map

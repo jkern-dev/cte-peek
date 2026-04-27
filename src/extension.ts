@@ -3,8 +3,9 @@ import { CteHoverProvider } from './cteHoverProvider';
 import { CteDefinitionProvider } from './cteDefinitionProvider';
 import { CtePreviewProvider, setupSelectionListener } from './cteSidePanel';
 import { clearCache, disposeCache } from './cteCache';
+import { clearDbtModelCache, setupDbtModelWatcher } from './dbtModelLocator';
 
-const SUPPORTED_LANGUAGES = ['sql', 'snowflake-sql', 'sql-mssql'];
+const SUPPORTED_LANGUAGES = ['sql', 'snowflake-sql', 'sql-mssql', 'jinja-sql'];
 
 export function activate(context: vscode.ExtensionContext): void {
   // Read-only preview provider (for "preview" mode)
@@ -13,6 +14,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.registerTextDocumentContentProvider('cte-peek', previewProvider)
   );
   context.subscriptions.push(previewProvider);
+
+  setupDbtModelWatcher(context);
 
   // Selection listener handles both "preview" and "side-panel" modes
   setupSelectionListener(context, previewProvider, SUPPORTED_LANGUAGES);
@@ -36,4 +39,5 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   disposeCache();
+  clearDbtModelCache();
 }

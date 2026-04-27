@@ -35,19 +35,17 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CteDefinitionProvider = void 0;
 const vscode = __importStar(require("vscode"));
-const cteCache_1 = require("./cteCache");
+const reference_1 = require("./reference");
 class CteDefinitionProvider {
-    provideDefinition(document, position, _token) {
-        const wordRange = document.getWordRangeAtPosition(position, /[a-zA-Z_][a-zA-Z0-9_]*/);
-        if (!wordRange)
+    async provideDefinition(document, position, _token) {
+        const ref = await (0, reference_1.resolveReferenceAt)(document, position);
+        if (!ref)
             return null;
-        const word = document.getText(wordRange);
-        const parseResult = (0, cteCache_1.getCachedCtes)(document);
-        const cte = parseResult.ctes.get(word.toLowerCase());
-        if (!cte)
-            return null;
-        const defPosition = document.positionAt(cte.nameOffset);
-        return new vscode.Location(document.uri, defPosition);
+        if (ref.kind === 'cte') {
+            const defPosition = document.positionAt(ref.cte.nameOffset);
+            return new vscode.Location(document.uri, defPosition);
+        }
+        return new vscode.Location(ref.targetUri, new vscode.Position(0, 0));
     }
 }
 exports.CteDefinitionProvider = CteDefinitionProvider;

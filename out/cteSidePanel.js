@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CtePreviewProvider = void 0;
 exports.setupSelectionListener = setupSelectionListener;
 const vscode = __importStar(require("vscode"));
-const cteCache_1 = require("./cteCache");
+const reference_1 = require("./reference");
 // ── Preview provider (read-only virtual documents) ──────────────────
 class CtePreviewProvider {
     _onDidChange = new vscode.EventEmitter();
@@ -60,7 +60,6 @@ class CtePreviewProvider {
         return true;
     }
     clearFrom(depth) {
-        // Remove all documents at depth and beyond
         for (let d = depth; d < 20; d++) {
             const key = this.getUri(d).toString();
             if (!this.docs.has(key))
@@ -109,18 +108,11 @@ function setupSelectionListener(context, previewProvider, supportedLanguages) {
     let debounceTimer;
     // ── Detect external tab closes ──
     context.subscriptions.push(vscode.window.onDidChangeVisibleTextEditors(() => {
-        // Walk stack from the end; remove entries whose tabs disappeared
         for (let i = panelStack.length - 1; i >= 0; i--) {
             const entry = panelStack[i];
-            const stillOpen = vscode.window.visibleTextEditors.some((e) => {
-                if (entry.previewUri) {
-                    return e.document.uri.toString() === entry.previewUri;
-                }
-                return (e.viewColumn === entry.viewColumn &&
-                    e.document.uri.toString() === sourceDocUri);
-            });
+            const stillOpen = vscode.window.visibleTextEditors.some((e) => e.viewColumn === entry.viewColumn &&
+                e.document.uri.toString() === entry.documentUri);
             if (!stillOpen) {
-                // This panel and everything deeper is gone
                 panelStack.splice(i);
                 previewProvider.clearFrom(i);
                 break;
@@ -138,47 +130,39 @@ function setupSelectionListener(context, previewProvider, supportedLanguages) {
             return;
         const doc = e.textEditor.document;
         const col = e.textEditor.viewColumn;
-        // Determine depth: source = -1, panel stack index by match
-        let clickDepth = -2; // -2 = unrelated editor, ignore
-        if (doc.uri.toString() === sourceDocUri && col === sourceViewColumn) {
-            clickDepth = -1; // source editor
+        const uriStr = doc.uri.toString();
+        let clickDepth = -2;
+        if (uriStr === sourceDocUri && col === sourceViewColumn) {
+            clickDepth = -1;
         }
-        else if (doc.uri.scheme === 'cte-peek') {
-            // Preview mode: match by URI
-            const d = previewProvider.depthOf(doc.uri);
-            if (d >= 0 && d < panelStack.length)
-                clickDepth = d;
-        }
-        else if (sourceDocUri && doc.uri.toString() === sourceDocUri) {
-            // Side-panel mode: match by viewColumn
-            const idx = panelStack.findIndex((p) => p.viewColumn === col);
+        else {
+            const idx = panelStack.findIndex((p) => p.viewColumn === col && p.documentUri === uriStr);
             if (idx >= 0)
                 clickDepth = idx;
         }
-        // If no panels open yet, accept any supported SQL file as source
-        if (panelStack.length === 0 && supportedLanguages.includes(doc.languageId)) {
+        if (clickDepth === -2 &&
+            panelStack.length === 0 &&
+            supportedLanguages.includes(doc.languageId)) {
             clickDepth = -1;
         }
         if (clickDepth === -2)
-            return; // unrelated editor
+            return;
         if (debounceTimer)
             clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-            handleSelection(e.textEditor, doc, clickDepth, mode);
+            void handleSelection(e.textEditor, doc, clickDepth, mode);
         }, 100);
     }));
     // ── Close panels from a given depth onward ──
     async function closePanelsFrom(depth) {
-        // Close tabs in reverse order (deepest first)
         for (let i = panelStack.length - 1; i >= depth; i--) {
             const entry = panelStack[i];
-            const targetUri = entry.previewUri ?? sourceDocUri;
             for (const tabGroup of vscode.window.tabGroups.all) {
                 if (tabGroup.viewColumn !== entry.viewColumn)
                     continue;
                 for (const tab of tabGroup.tabs) {
                     if (tab.input instanceof vscode.TabInputText &&
-                        tab.input.uri.toString() === targetUri) {
+                        tab.input.uri.toString() === entry.documentUri) {
                         await vscode.window.tabGroups.close(tab);
                     }
                 }
@@ -186,58 +170,32 @@ function setupSelectionListener(context, previewProvider, supportedLanguages) {
         }
         panelStack.splice(depth);
         previewProvider.clearFrom(depth);
-        if (depth === 0)
+        if (depth === 0) {
             sourceDocUri = '';
+            sourceViewColumn = undefined;
+        }
     }
     // ── Main handler ──
     async function handleSelection(editor, doc, clickDepth, mode) {
         const { maxDepth } = getConfig();
         const position = editor.selection.active;
-        const wordRange = doc.getWordRangeAtPosition(position, /[a-zA-Z_][a-zA-Z0-9_]*/);
-        // Resolve CTE from the SOURCE document's parse result
-        let parseResult;
-        if (sourceDocUri && clickDepth >= 0) {
-            // Click is in a panel — look up CTEs from the source document
-            const sourceEditors = vscode.window.visibleTextEditors.filter((e) => e.document.uri.toString() === sourceDocUri);
-            if (sourceEditors.length === 0) {
-                await closePanelsFrom(0);
-                return;
-            }
-            parseResult = (0, cteCache_1.getCachedCtes)(sourceEditors[0].document);
-        }
-        else {
-            parseResult = (0, cteCache_1.getCachedCtes)(doc);
-        }
-        if (!wordRange) {
-            // No word under cursor
+        const ref = await (0, reference_1.resolveReferenceAt)(doc, position);
+        if (!ref) {
             if (clickDepth === -1) {
                 await closePanelsFrom(0);
             }
             else {
-                // Clicked in a panel — keep it open, close only deeper panels
                 await closePanelsFrom(clickDepth + 1);
             }
             return;
         }
-        const word = doc.getText(wordRange);
-        const cte = parseResult.ctes.get(word.toLowerCase());
-        if (!cte) {
-            if (clickDepth === -1) {
-                await closePanelsFrom(0);
-            }
-            else {
-                // Clicked a non-CTE word in a panel — keep it open, close only deeper panels
-                await closePanelsFrom(clickDepth + 1);
-            }
-            return;
-        }
-        // Skip if clicking the CTE definition itself (not a reference)
-        // In side-panel mode doc is the source document so positionAt works directly.
-        // In preview mode the body never contains the definition name, so this is safe.
-        if (doc.uri.scheme !== 'cte-peek') {
-            const defPos = doc.positionAt(cte.nameOffset);
-            if (defPos.line === wordRange.start.line &&
-                defPos.character === wordRange.start.character) {
+        // For CTEs, skip when the cursor is sitting on the definition itself
+        // (not a reference). Only meaningful when the click is in a non-virtual doc
+        // — the cte-peek body never contains the definition name.
+        if (ref.kind === 'cte' && doc.uri.scheme !== 'cte-peek') {
+            const defPos = doc.positionAt(ref.cte.nameOffset);
+            if (defPos.line === ref.range.start.line &&
+                defPos.character === ref.range.start.character) {
                 if (clickDepth === -1) {
                     await closePanelsFrom(0);
                 }
@@ -247,40 +205,36 @@ function setupSelectionListener(context, previewProvider, supportedLanguages) {
                 return;
             }
         }
-        // Target depth for the new panel
         const targetDepth = clickDepth + 1;
-        // Enforce max nesting
         if (targetDepth >= maxDepth)
             return;
-        // If same CTE already at target depth, nothing to do
+        const newKey = (0, reference_1.referenceKey)(ref);
         if (targetDepth < panelStack.length &&
-            panelStack[targetDepth].cteName === cte.nameLower) {
-            // But close anything deeper that might be stale
+            panelStack[targetDepth].refKey === newKey) {
             if (targetDepth + 1 < panelStack.length) {
                 await closePanelsFrom(targetDepth + 1);
             }
             return;
         }
-        // Close panels from targetDepth onward (replacing)
         if (targetDepth < panelStack.length) {
             await closePanelsFrom(targetDepth);
         }
-        // Record source document on first open
         if (clickDepth === -1) {
             sourceDocUri = doc.uri.toString();
             sourceViewColumn = editor.viewColumn;
         }
-        // Open the new panel
-        if (mode === 'side-panel') {
-            await openSidePanel(targetDepth, cte);
+        if (ref.kind === 'cte' && mode === 'preview') {
+            await openCtePreview(targetDepth, ref);
+        }
+        else if (ref.kind === 'cte') {
+            await openCteSidePanel(targetDepth, ref);
         }
         else {
-            await openPreview(targetDepth, cte);
+            await openDbtPanel(targetDepth, ref);
         }
     }
     // ── Open helpers ──
-    async function openSidePanel(depth, cte) {
-        // Open beside the rightmost existing panel (or source)
+    async function openCteSidePanel(depth, ref) {
         const sourceDoc = vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === sourceDocUri)?.document;
         if (!sourceDoc)
             return;
@@ -291,14 +245,16 @@ function setupSelectionListener(context, previewProvider, supportedLanguages) {
         });
         panelStack[depth] = {
             viewColumn: sideEditor.viewColumn,
-            cteName: cte.nameLower,
+            refKey: (0, reference_1.referenceKey)(ref),
+            documentUri: sourceDoc.uri.toString(),
+            isVirtual: false,
         };
-        const cteStart = sourceDoc.positionAt(cte.nameOffset);
-        const cteEnd = sourceDoc.positionAt(cte.bodyEndOffset + 1);
+        const cteStart = sourceDoc.positionAt(ref.cte.nameOffset);
+        const cteEnd = sourceDoc.positionAt(ref.cte.bodyEndOffset + 1);
         sideEditor.revealRange(new vscode.Range(cteStart, cteEnd), vscode.TextEditorRevealType.InCenter);
     }
-    async function openPreview(depth, cte) {
-        previewProvider.updateAt(depth, cte.name, cte.body);
+    async function openCtePreview(depth, ref) {
+        previewProvider.updateAt(depth, ref.name, ref.cte.body);
         const uri = previewProvider.getUri(depth);
         await previewProvider.ensureLanguage(uri);
         const previewEditor = await vscode.window.showTextDocument(uri, {
@@ -308,8 +264,22 @@ function setupSelectionListener(context, previewProvider, supportedLanguages) {
         });
         panelStack[depth] = {
             viewColumn: previewEditor.viewColumn,
-            cteName: cte.nameLower,
-            previewUri: uri.toString(),
+            refKey: (0, reference_1.referenceKey)(ref),
+            documentUri: uri.toString(),
+            isVirtual: true,
+        };
+    }
+    async function openDbtPanel(depth, ref) {
+        const editor = await vscode.window.showTextDocument(ref.targetUri, {
+            viewColumn: vscode.ViewColumn.Beside,
+            preserveFocus: true,
+            preview: true,
+        });
+        panelStack[depth] = {
+            viewColumn: editor.viewColumn,
+            refKey: (0, reference_1.referenceKey)(ref),
+            documentUri: ref.targetUri.toString(),
+            isVirtual: false,
         };
     }
 }

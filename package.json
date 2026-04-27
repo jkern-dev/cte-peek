@@ -1,8 +1,8 @@
 {
   "name": "sql-cte-peek",
   "displayName": "SQL CTE Peek",
-  "description": "Hover over CTE aliases to see their query body. Ctrl+Click to jump to definition.",
-  "version": "0.1.1",
+  "description": "Peek CTE bodies and dbt {{ ref('...') }} model files inline. Ctrl+Click to jump to definition.",
+  "version": "0.2.0",
   "publisher": "joshkern",
   "repository": {
     "type": "git",
@@ -26,7 +26,8 @@
   "activationEvents": [
     "onLanguage:sql",
     "onLanguage:snowflake-sql",
-    "onLanguage:sql-mssql"
+    "onLanguage:sql-mssql",
+    "onLanguage:jinja-sql"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -38,18 +39,36 @@
           "enum": ["hover", "preview", "side-panel"],
           "enumDescriptions": [
             "Inline popup on hover (read-only)",
-            "Read-only CTE preview in a side panel",
-            "Editable split editor scrolled to the CTE definition"
+            "Read-only preview in a side panel",
+            "Editable split editor scrolled to the reference target"
           ],
           "default": "side-panel",
-          "description": "How to display CTE previews."
+          "description": "How to display previews."
+        },
+        "sqlCtePeek.triggerMode": {
+          "type": "string",
+          "enum": ["cte", "dbt", "both"],
+          "enumDescriptions": [
+            "Only CTE aliases trigger previews",
+            "Only dbt {{ ref('...') }} model references trigger previews",
+            "Both CTEs and dbt refs trigger previews"
+          ],
+          "default": "both",
+          "description": "Which kinds of references trigger a preview."
         },
         "sqlCtePeek.maxNestingDepth": {
           "type": "integer",
           "default": 3,
           "minimum": 1,
           "maximum": 10,
-          "description": "Maximum number of nested CTE preview panels that can be opened when drilling into CTE references."
+          "description": "Maximum number of nested preview panels that can be opened when drilling into references."
+        },
+        "sqlCtePeek.hoverPreviewLines": {
+          "type": "integer",
+          "default": 50,
+          "minimum": 5,
+          "maximum": 500,
+          "description": "Maximum lines of a dbt model file shown in hover previews."
         }
       }
     }

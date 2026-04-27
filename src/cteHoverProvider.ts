@@ -1,34 +1,61 @@
 import * as vscode from 'vscode';
-import { getCachedCtes } from './cteCache';
+import { resolveReferenceAt } from './reference';
 
 export class CteHoverProvider implements vscode.HoverProvider {
-  provideHover(
+  async provideHover(
     document: vscode.TextDocument,
     position: vscode.Position,
     _token: vscode.CancellationToken
-  ): vscode.Hover | null {
-    const mode = vscode.workspace.getConfiguration('sqlCtePeek').get<string>('displayMode', 'side-panel');
+  ): Promise<vscode.Hover | null> {
+    const mode = vscode.workspace
+      .getConfiguration('sqlCtePeek')
+      .get<string>('displayMode', 'side-panel');
     if (mode !== 'hover') return null;
 
-    const wordRange = document.getWordRangeAtPosition(position, /[a-zA-Z_][a-zA-Z0-9_]*/);
-    if (!wordRange) return null;
-    const word = document.getText(wordRange);
+    const ref = await resolveReferenceAt(document, position);
+    if (!ref) return null;
 
-    const parseResult = getCachedCtes(document);
-    const cte = parseResult.ctes.get(word.toLowerCase());
-    if (!cte) return null;
+    const md = new vscode.MarkdownString();
+    md.isTrusted = true;
+    md.supportHtml = false;
 
-    // Don't show hover on the CTE definition itself
-    const defPos = document.positionAt(cte.nameOffset);
-    if (defPos.line === wordRange.start.line && defPos.character === wordRange.start.character) {
+    if (ref.kind === 'cte') {
+      const defPos = document.positionAt(ref.cte.nameOffset);
+      if (
+        defPos.line === ref.range.start.line &&
+        defPos.character === ref.range.start.character
+      ) {
+        return null;
+      }
+      md.appendMarkdown(`**CTE:** \`${ref.name}\`\n\n`);
+      md.appendCodeblock(ref.cte.body, 'sql');
+      return new vscode.Hover(md, ref.range);
+    }
+
+    const lineLimit = vscode.workspace
+      .getConfiguration('sqlCtePeek')
+      .get<number>('hoverPreviewLines', 50);
+
+    let snippet = '';
+    let truncated = false;
+    try {
+      const bytes = await vscode.workspace.fs.readFile(ref.targetUri);
+      const text = Buffer.from(bytes).toString('utf8');
+      const lines = text.split(/\r?\n/);
+      truncated = lines.length > lineLimit;
+      snippet = lines.slice(0, lineLimit).join('\n');
+    } catch {
       return null;
     }
 
-    const markdown = new vscode.MarkdownString();
-    markdown.appendMarkdown(`**CTE:** \`${cte.name}\`\n\n`);
-    markdown.appendCodeblock(cte.body, 'sql');
-    markdown.isTrusted = true;
-
-    return new vscode.Hover(markdown, wordRange);
+    const openArgs = encodeURIComponent(JSON.stringify([ref.targetUri.toString()]));
+    md.appendMarkdown(
+      `**dbt model:** \`${ref.name}\` — [open file](command:vscode.open?${openArgs})\n\n`
+    );
+    md.appendCodeblock(snippet, 'sql');
+    if (truncated) {
+      md.appendMarkdown(`\n_…truncated at ${lineLimit} lines_`);
+    }
+    return new vscode.Hover(md, ref.range);
   }
 }
